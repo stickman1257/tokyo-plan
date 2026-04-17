@@ -874,115 +874,67 @@ with tab2:
         ]},
     ]
 
-    # ── MapLibre GL JS + OpenFreeMap (완전 무료, 한국어 라벨) ──
-    markers_json   = json.dumps(markers,   ensure_ascii=False)
-    polylines_json = json.dumps(polylines, ensure_ascii=False)
+    # ── folium + st_folium (안정적, 한국어 팝업) ───────────────
+    m = folium.Map(location=[35.69, 139.75], zoom_start=11,
+                   tiles="CartoDB positron")
 
-    maplibre_html = f"""<!DOCTYPE html>
-<html><head>
-<meta charset="utf-8">
-<link href="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.css" rel="stylesheet">
-<script src="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.js"></script>
-<style>
-  html, body {{ margin:0; padding:0; }}
-  #map {{ height:600px; width:100%; }}
-  .maplibregl-popup-content {{
-    border-radius:12px !important;
-    box-shadow:0 4px 20px rgba(0,0,0,0.15) !important;
-    padding:14px 16px !important;
-    font-family:'Noto Sans KR','Apple SD Gothic Neo',sans-serif;
-    min-width:220px; max-width:290px;
-    font-size:13px; line-height:1.65;
-  }}
-  .maplibregl-popup-close-button {{ font-size:18px; right:6px; top:4px; }}
-</style>
-</head>
-<body>
-<div id="map"></div>
-<script>
-const MARKERS   = {markers_json};
-const POLYLINES = {polylines_json};
+    folium_color_map = {"day1": "red", "day2": "blue", "day3": "green"}
 
-const map = new maplibregl.Map({{
-  container: 'map',
-  style: 'https://tiles.openfreemap.org/styles/liberty',
-  center: [139.75, 35.69],
-  zoom: 11,
-}});
+    for day_key, cfg in day_cfg.items():
+        for spot_key in cfg["spots"]:
+            spot = SPOTS[spot_key]
+            fee_text = "무료" if spot["fee"] == 0 else f"¥{spot['fee']:,}"
+            tip_row = f"<tr><td colspan='2' style='color:#27ae60;font-size:11px;padding-top:4px;'>💡 {spot['tips']}</td></tr>" if spot.get("tips") else ""
+            popup_html = f"""
+            <div style="font-family:'Noto Sans KR',sans-serif;min-width:220px;font-size:13px;line-height:1.6;">
+              <b style="font-size:14px;">{spot['name']}</b><br>
+              <span style="background:{cfg['color']};color:white;padding:1px 7px;border-radius:10px;font-size:11px;">{cfg['label']}</span>
+              <hr style="margin:6px 0;border:none;border-top:1px solid #eee;">
+              <table style="width:100%;border-collapse:collapse;">
+                <tr><td style="color:#888;padding:1px 4px;">⏰ 운영</td><td>{spot['hours']}</td></tr>
+                <tr><td style="color:#888;padding:1px 4px;">💰 입장료</td><td>{fee_text}</td></tr>
+                <tr><td colspan="2" style="font-size:12px;color:#444;padding-top:4px;">{spot['desc']}</td></tr>
+                {tip_row}
+              </table>
+            </div>"""
+            folium.Marker(
+                location=[spot["lat"], spot["lon"]],
+                tooltip=folium.Tooltip(spot["name"], sticky=True),
+                popup=folium.Popup(popup_html, max_width=300),
+                icon=folium.Icon(color=folium_color_map[day_key], icon="map-marker", prefix="fa"),
+            ).add_to(m)
 
-map.addControl(new maplibregl.NavigationControl(), 'top-right');
-map.addControl(new maplibregl.ScaleControl({{ unit: 'metric' }}), 'bottom-left');
+    for hotel in HOTELS:
+        popup_html = f"""
+        <div style="font-family:'Noto Sans KR',sans-serif;min-width:220px;font-size:13px;line-height:1.6;">
+          <b style="font-size:14px;">🏨 {hotel['name']}</b><br>
+          <span style="background:#e67e22;color:white;padding:1px 7px;border-radius:10px;font-size:11px;">숙소 | {hotel['area']}</span>
+          <hr style="margin:6px 0;border:none;border-top:1px solid #eee;">
+          <table style="width:100%;border-collapse:collapse;">
+            <tr><td style="color:#888;padding:1px 4px;">💰 1박</td><td>₩{hotel['price_per_night_krw']:,}</td></tr>
+            <tr><td style="color:#888;padding:1px 4px;">🚃 접근</td><td>{hotel['access']}</td></tr>
+            <tr><td style="color:#888;padding:1px 4px;">✈️ 공항</td><td style="font-size:11px;">{hotel['airport_access']}</td></tr>
+          </table>
+        </div>"""
+        folium.Marker(
+            location=[hotel["lat"], hotel["lon"]],
+            tooltip=folium.Tooltip(f"🏨 {hotel['name']}", sticky=True),
+            popup=folium.Popup(popup_html, max_width=300),
+            icon=folium.Icon(color="orange", icon="home", prefix="fa"),
+        ).add_to(m)
 
-function makePin(color) {{
-  const el = document.createElement('div');
-  el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 48" width="34" height="50">
-    <path d="M16 0C7.16 0 0 7.16 0 16c0 12 16 32 16 32S32 28 32 16C32 7.16 24.84 0 16 0z"
-          fill="${{color}}" stroke="white" stroke-width="2.5"/>
-    <circle cx="16" cy="15" r="6" fill="white"/>
-  </svg>`;
-  el.style.cursor = 'pointer';
-  return el;
-}}
+    # 경로선
+    route_coords = {
+        "day1": [[SPOTS[k]["lat"], SPOTS[k]["lon"]] for k in ["narita_airport","ueno_park","ameyoko","ginza"]],
+        "day2": [[SPOTS[k]["lat"], SPOTS[k]["lon"]] for k in ["ginza","shibuya","shinjuku_gyoen","shinjuku_omoide","ginza"]],
+        "day3": [[SPOTS[k]["lat"], SPOTS[k]["lon"]] for k in ["ginza","tokyo_station","ueno_park","narita_airport"]],
+    }
+    route_colors = {"day1": "#e74c3c", "day2": "#2980b9", "day3": "#27ae60"}
+    for day_key, coords in route_coords.items():
+        folium.PolyLine(coords, color=route_colors[day_key],
+                        weight=3, opacity=0.8, dash_array="10 6").add_to(m)
 
-map.on('style.load', function() {{
-
-  /* ── 지도 라벨 한국어로 변경 ── */
-  map.getStyle().layers.forEach(function(layer) {{
-    if (layer.type !== 'symbol') return;
-    try {{
-      const tf = map.getLayoutProperty(layer.id, 'text-field');
-      if (!tf) return;
-      map.setLayoutProperty(layer.id, 'text-field', [
-        'coalesce', ['get', 'name:ko'], ['get', 'name_ko'], tf
-      ]);
-    }} catch(e) {{}}
-  }});
-
-  /* ── 경로선 추가 ── */
-  POLYLINES.forEach(function(p, i) {{
-    map.addSource('route' + i, {{
-      type: 'geojson',
-      data: {{
-        type: 'Feature',
-        geometry: {{
-          type: 'LineString',
-          coordinates: p.coords.map(function(c) {{ return [c[1], c[0]]; }})
-        }}
-      }}
-    }});
-    map.addLayer({{
-      id: 'route' + i,
-      type: 'line',
-      source: 'route' + i,
-      layout: {{ 'line-join': 'round', 'line-cap': 'round' }},
-      paint: {{
-        'line-color': p.color,
-        'line-width': 3.5,
-        'line-opacity': 0.85,
-        'line-dasharray': [3, 2]
-      }}
-    }});
-  }});
-
-  /* ── 마커 추가 ── */
-  MARKERS.forEach(function(d) {{
-    const popup = new maplibregl.Popup({{ offset: [0, -50], maxWidth: '300px' }})
-      .setHTML('<div>' + d.popup + '</div>');
-    new maplibregl.Marker({{ element: makePin(d.color), anchor: 'bottom' }})
-      .setLngLat([d.lng, d.lat])
-      .setPopup(popup)
-      .addTo(map);
-  }});
-
-  /* ── 전체 마커 보이도록 자동 줌 ── */
-  const bounds = new maplibregl.LngLatBounds();
-  MARKERS.forEach(function(d) {{ bounds.extend([d.lng, d.lat]); }});
-  map.fitBounds(bounds, {{ padding: 50, maxZoom: 12 }});
-}});
-</script>
-</body></html>"""
-
-    components.html(maplibre_html, height=640)
+    st_folium(m, height=600, use_container_width=True)
 
 
 # ============================================================
