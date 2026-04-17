@@ -791,10 +791,11 @@ with tab1:
 
 
 # ============================================================
-# Tab 2: 지도 (Google Maps 한국어)
+# Tab 2: 지도 (Leaflet.js + OpenStreetMap — 완전 무료)
 # ============================================================
 with tab2:
-    st.markdown("### 🗺️ 3일간 방문 장소 지도 (Google Maps 한국어)")
+    st.markdown("### 🗺️ 3일간 방문 장소 지도")
+    st.caption("Leaflet.js + OpenStreetMap — 마커 클릭 시 한국어 상세 정보 표시")
 
     col_l1, col_l2, col_l3, col_l4 = st.columns(4)
     with col_l1:
@@ -806,151 +807,182 @@ with tab2:
     with col_l4:
         st.markdown("🟠 **숙소** (긴자)")
 
-    key_col, help_col = st.columns([5, 1])
-    with key_col:
-        gmaps_key = st.text_input(
-            "Google Maps API Key",
-            type="password",
-            placeholder="🔑 Google Maps API Key 입력 (AIzaSy...)",
-            label_visibility="collapsed",
-        )
-    with help_col:
-        st.markdown("[키 발급 방법 →](https://developers.google.com/maps/documentation/javascript/get-api-key)")
-
-    # 마커 데이터 구성
-    day_spots = {
-        "day1": {
-            "icon": "http://maps.google.com/mapfiles/ms/icons/red-dot.png",
-            "label": "1일차 (5/1 목)",
-            "spots": ["narita_airport", "ueno_park", "ameyoko", "ginza"],
-        },
-        "day2": {
-            "icon": "http://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-            "label": "2일차 (5/2 금)",
-            "spots": ["shibuya", "shibuya_sky", "shinjuku_gyoen", "shinjuku_omoide"],
-        },
-        "day3": {
-            "icon": "http://maps.google.com/mapfiles/ms/icons/green-dot.png",
-            "label": "3일차 (5/3 토)",
-            "spots": ["tokyo_station", "ueno_park", "narita_airport"],
-        },
+    # ── 마커 데이터 ──────────────────────────────────────────
+    day_cfg = {
+        "day1": {"color": "#e74c3c", "label": "1일차 (5/1 목)",
+                 "spots": ["narita_airport", "ueno_park", "ameyoko", "ginza"]},
+        "day2": {"color": "#2980b9", "label": "2일차 (5/2 금)",
+                 "spots": ["shibuya", "shibuya_sky", "shinjuku_gyoen", "shinjuku_omoide"]},
+        "day3": {"color": "#27ae60", "label": "3일차 (5/3 토)",
+                 "spots": ["tokyo_station", "ueno_park", "narita_airport"]},
     }
 
     markers = []
-    for day_key, info in day_spots.items():
-        for spot_key in info["spots"]:
+    for day_key, cfg in day_cfg.items():
+        for spot_key in cfg["spots"]:
             spot = SPOTS[spot_key]
             fee_text = "무료" if spot["fee"] == 0 else f"¥{spot['fee']:,}"
-            markers.append({
-                "lat": spot["lat"],
-                "lng": spot["lon"],
-                "title": spot["name"],
-                "body": f"<b>{spot['name']}</b><br><span style='color:#888;font-size:12px;'>{info['label']}</span><hr style='margin:4px 0;'><b>운영:</b> {spot['hours']}<br><b>입장료:</b> {fee_text}<br><p style='font-size:12px;color:#555;margin:4px 0 0;'>{spot['desc']}</p>",
-                "icon": info["icon"],
-            })
+            tip = f"<p style='margin:6px 0 0;font-size:12px;color:#27ae60;'>{spot['tips']}</p>" if spot.get("tips") else ""
+            popup = (
+                f"<b style='font-size:14px;'>{spot['name']}</b><br>"
+                f"<span style='color:#888;font-size:12px;background:#f5f5f5;padding:1px 6px;border-radius:10px;'>{cfg['label']}</span>"
+                f"<hr style='margin:6px 0;border:none;border-top:1px solid #eee;'>"
+                f"<table style='font-size:12px;line-height:1.8;width:100%;'>"
+                f"<tr><td style='color:#888;'>⏰ 운영</td><td>{spot['hours']}</td></tr>"
+                f"<tr><td style='color:#888;'>💰 입장료</td><td>{fee_text}</td></tr>"
+                f"</table>"
+                f"<p style='font-size:12px;color:#444;margin:6px 0 0;'>{spot['desc']}</p>"
+                f"{tip}"
+            )
+            markers.append({"lat": spot["lat"], "lng": spot["lon"],
+                             "color": cfg["color"], "title": spot["name"], "popup": popup})
 
     for hotel in HOTELS:
-        markers.append({
-            "lat": hotel["lat"],
-            "lng": hotel["lon"],
-            "title": f"🏨 {hotel['name']}",
-            "body": f"<b>🏨 {hotel['name']}</b><br><span style='color:#888;font-size:12px;'>숙소 | {hotel['area']}</span><hr style='margin:4px 0;'><b>1박:</b> ₩{hotel['price_per_night_krw']:,}<br><b>접근:</b> {hotel['access']}",
-            "icon": "http://maps.google.com/mapfiles/ms/icons/orange-dot.png",
-        })
+        popup = (
+            f"<b style='font-size:14px;'>🏨 {hotel['name']}</b><br>"
+            f"<span style='color:#888;font-size:12px;background:#fff3e0;padding:1px 6px;border-radius:10px;'>숙소 | {hotel['area']}</span>"
+            f"<hr style='margin:6px 0;border:none;border-top:1px solid #eee;'>"
+            f"<table style='font-size:12px;line-height:1.8;width:100%;'>"
+            f"<tr><td style='color:#888;'>💰 1박</td><td>₩{hotel['price_per_night_krw']:,}</td></tr>"
+            f"<tr><td style='color:#888;'>🚃 접근</td><td>{hotel['access']}</td></tr>"
+            f"<tr><td style='color:#888;'>✈️ 공항</td><td>{hotel['airport_access']}</td></tr>"
+            f"</table>"
+        )
+        markers.append({"lat": hotel["lat"], "lng": hotel["lon"],
+                        "color": "#e67e22", "title": hotel["name"], "popup": popup})
 
-    # 경로선 데이터
+    # ── 경로선 데이터 ─────────────────────────────────────────
     polylines = [
-        {
-            "coords": [
-                {"lat": SPOTS["narita_airport"]["lat"], "lng": SPOTS["narita_airport"]["lon"]},
-                {"lat": SPOTS["ueno_park"]["lat"],      "lng": SPOTS["ueno_park"]["lon"]},
-                {"lat": SPOTS["ameyoko"]["lat"],        "lng": SPOTS["ameyoko"]["lon"]},
-                {"lat": SPOTS["ginza"]["lat"],          "lng": SPOTS["ginza"]["lon"]},
-            ],
-            "color": "#e74c3c",
-        },
-        {
-            "coords": [
-                {"lat": SPOTS["ginza"]["lat"],           "lng": SPOTS["ginza"]["lon"]},
-                {"lat": SPOTS["shibuya"]["lat"],         "lng": SPOTS["shibuya"]["lon"]},
-                {"lat": SPOTS["shinjuku_gyoen"]["lat"],  "lng": SPOTS["shinjuku_gyoen"]["lon"]},
-                {"lat": SPOTS["shinjuku_omoide"]["lat"], "lng": SPOTS["shinjuku_omoide"]["lon"]},
-                {"lat": SPOTS["ginza"]["lat"],           "lng": SPOTS["ginza"]["lon"]},
-            ],
-            "color": "#2980b9",
-        },
-        {
-            "coords": [
-                {"lat": SPOTS["ginza"]["lat"],          "lng": SPOTS["ginza"]["lon"]},
-                {"lat": SPOTS["tokyo_station"]["lat"],  "lng": SPOTS["tokyo_station"]["lon"]},
-                {"lat": SPOTS["ueno_park"]["lat"],      "lng": SPOTS["ueno_park"]["lon"]},
-                {"lat": SPOTS["narita_airport"]["lat"], "lng": SPOTS["narita_airport"]["lon"]},
-            ],
-            "color": "#27ae60",
-        },
+        {"color": "#e74c3c", "coords": [
+            [SPOTS["narita_airport"]["lat"], SPOTS["narita_airport"]["lon"]],
+            [SPOTS["ueno_park"]["lat"],      SPOTS["ueno_park"]["lon"]],
+            [SPOTS["ameyoko"]["lat"],        SPOTS["ameyoko"]["lon"]],
+            [SPOTS["ginza"]["lat"],          SPOTS["ginza"]["lon"]],
+        ]},
+        {"color": "#2980b9", "coords": [
+            [SPOTS["ginza"]["lat"],           SPOTS["ginza"]["lon"]],
+            [SPOTS["shibuya"]["lat"],         SPOTS["shibuya"]["lon"]],
+            [SPOTS["shinjuku_gyoen"]["lat"],  SPOTS["shinjuku_gyoen"]["lon"]],
+            [SPOTS["shinjuku_omoide"]["lat"], SPOTS["shinjuku_omoide"]["lon"]],
+            [SPOTS["ginza"]["lat"],           SPOTS["ginza"]["lon"]],
+        ]},
+        {"color": "#27ae60", "coords": [
+            [SPOTS["ginza"]["lat"],          SPOTS["ginza"]["lon"]],
+            [SPOTS["tokyo_station"]["lat"],  SPOTS["tokyo_station"]["lon"]],
+            [SPOTS["ueno_park"]["lat"],      SPOTS["ueno_park"]["lon"]],
+            [SPOTS["narita_airport"]["lat"], SPOTS["narita_airport"]["lon"]],
+        ]},
     ]
 
-    if gmaps_key:
-        markers_json   = json.dumps(markers,    ensure_ascii=False)
-        polylines_json = json.dumps(polylines,  ensure_ascii=False)
-        html = f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<style>html,body{{margin:0;padding:0;height:100%}}#map{{height:600px;width:100%}}</style>
-</head><body>
+    # ── MapLibre GL JS + OpenFreeMap (완전 무료, 한국어 라벨) ──
+    markers_json   = json.dumps(markers,   ensure_ascii=False)
+    polylines_json = json.dumps(polylines, ensure_ascii=False)
+
+    maplibre_html = f"""<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<link href="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.css" rel="stylesheet">
+<script src="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.js"></script>
+<style>
+  html, body {{ margin:0; padding:0; height:100%; }}
+  #map {{ position:absolute; top:0; bottom:0; width:100%; }}
+  .maplibregl-popup-content {{
+    border-radius:12px !important;
+    box-shadow:0 4px 20px rgba(0,0,0,0.15) !important;
+    padding:14px 16px !important;
+    font-family:'Noto Sans KR','Apple SD Gothic Neo',sans-serif;
+    min-width:220px; max-width:290px;
+    font-size:13px; line-height:1.65;
+  }}
+  .maplibregl-popup-close-button {{ font-size:18px; right:6px; top:4px; }}
+</style>
+</head>
+<body>
 <div id="map"></div>
 <script>
 const MARKERS   = {markers_json};
 const POLYLINES = {polylines_json};
-let map, infoWindow;
-function initMap() {{
-    map = new google.maps.Map(document.getElementById('map'), {{
-        zoom: 11,
-        center: {{lat: 35.68, lng: 139.75}},
-    }});
-    infoWindow = new google.maps.InfoWindow();
-    MARKERS.forEach(function(d) {{
-        const mk = new google.maps.Marker({{
-            position: {{lat: d.lat, lng: d.lng}},
-            map: map, title: d.title,
-            icon: d.icon,
-        }});
-        mk.addListener('click', function() {{
-            infoWindow.setContent('<div style="font-family:\'Noto Sans KR\',sans-serif;min-width:200px;font-size:13px;">' + d.body + '</div>');
-            infoWindow.open(map, mk);
-        }});
-    }});
-    POLYLINES.forEach(function(p) {{
-        new google.maps.Polyline({{
-            path: p.coords, map: map,
-            strokeColor: p.color, strokeOpacity: 0.7,
-            strokeWeight: 3, icons: [{{icon:{{path:'M 0,-1 0,1',strokeOpacity:1,scale:3}},offset:'0',repeat:'16px'}}]
-        }});
-    }});
-}}
-</script>
-<script async defer src="https://maps.googleapis.com/maps/api/js?key={gmaps_key}&callback=initMap&language=ko&region=JP"></script>
-</body></html>"""
-        components.html(html, height=620)
 
-    else:
-        st.info("💡 Google Maps API 키를 입력하면 한국어 구글 지도가 표시됩니다. 키가 없으면 아래 기본 지도를 이용하세요.")
-        m = folium.Map(location=[35.68, 139.75], zoom_start=11, tiles="OpenStreetMap")
-        folium_colors = {"day1": "red", "day2": "blue", "day3": "green"}
-        for day_key, info in day_spots.items():
-            for spot_key in info["spots"]:
-                spot = SPOTS[spot_key]
-                folium.Marker(
-                    location=[spot["lat"], spot["lon"]],
-                    tooltip=spot["name"],
-                    icon=folium.Icon(color=folium_colors[day_key], icon="info-sign"),
-                ).add_to(m)
-        for hotel in HOTELS:
-            folium.Marker(
-                location=[hotel["lat"], hotel["lon"]],
-                tooltip=f"🏨 {hotel['name']}",
-                icon=folium.Icon(color="orange", icon="home"),
-            ).add_to(m)
-        st_folium(m, height=550, use_container_width=True)
+const map = new maplibregl.Map({{
+  container: 'map',
+  style: 'https://tiles.openfreemap.org/styles/liberty',
+  center: [139.75, 35.69],
+  zoom: 11,
+}});
+
+map.addControl(new maplibregl.NavigationControl(), 'top-right');
+map.addControl(new maplibregl.ScaleControl({{ unit: 'metric' }}), 'bottom-left');
+
+function makePin(color) {{
+  const el = document.createElement('div');
+  el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 48" width="34" height="50">
+    <path d="M16 0C7.16 0 0 7.16 0 16c0 12 16 32 16 32S32 28 32 16C32 7.16 24.84 0 16 0z"
+          fill="${{color}}" stroke="white" stroke-width="2.5"/>
+    <circle cx="16" cy="15" r="6" fill="white"/>
+  </svg>`;
+  el.style.cursor = 'pointer';
+  return el;
+}}
+
+map.on('style.load', function() {{
+
+  /* ── 지도 라벨 한국어로 변경 ── */
+  map.getStyle().layers.forEach(function(layer) {{
+    if (layer.type !== 'symbol') return;
+    try {{
+      const tf = map.getLayoutProperty(layer.id, 'text-field');
+      if (!tf) return;
+      map.setLayoutProperty(layer.id, 'text-field', [
+        'coalesce', ['get', 'name:ko'], ['get', 'name_ko'], tf
+      ]);
+    }} catch(e) {{}}
+  }});
+
+  /* ── 경로선 추가 ── */
+  POLYLINES.forEach(function(p, i) {{
+    map.addSource('route' + i, {{
+      type: 'geojson',
+      data: {{
+        type: 'Feature',
+        geometry: {{
+          type: 'LineString',
+          coordinates: p.coords.map(function(c) {{ return [c[1], c[0]]; }})
+        }}
+      }}
+    }});
+    map.addLayer({{
+      id: 'route' + i,
+      type: 'line',
+      source: 'route' + i,
+      layout: {{ 'line-join': 'round', 'line-cap': 'round' }},
+      paint: {{
+        'line-color': p.color,
+        'line-width': 3.5,
+        'line-opacity': 0.85,
+        'line-dasharray': [3, 2]
+      }}
+    }});
+  }});
+
+  /* ── 마커 추가 ── */
+  MARKERS.forEach(function(d) {{
+    const popup = new maplibregl.Popup({{ offset: [0, -50], maxWidth: '300px' }})
+      .setHTML('<div>' + d.popup + '</div>');
+    new maplibregl.Marker({{ element: makePin(d.color), anchor: 'bottom' }})
+      .setLngLat([d.lng, d.lat])
+      .setPopup(popup)
+      .addTo(map);
+  }});
+
+  /* ── 전체 마커 보이도록 자동 줌 ── */
+  const bounds = new maplibregl.LngLatBounds();
+  MARKERS.forEach(function(d) {{ bounds.extend([d.lng, d.lat]); }});
+  map.fitBounds(bounds, {{ padding: 50, maxZoom: 12 }});
+}});
+</script>
+</body></html>"""
+
+    components.html(maplibre_html, height=640)
 
 
 # ============================================================
