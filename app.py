@@ -6,7 +6,9 @@
 #   streamlit run app.py
 # ============================================================
 
+import json
 import streamlit as st
+import streamlit.components.v1 as components
 import folium
 from streamlit_folium import st_folium
 
@@ -789,11 +791,10 @@ with tab1:
 
 
 # ============================================================
-# Tab 2: 지도
+# Tab 2: 지도 (Google Maps 한국어)
 # ============================================================
 with tab2:
-    st.markdown("### 🗺️ 3일간 방문 장소 지도")
-    st.markdown("마커를 클릭하면 장소 정보를 확인할 수 있습니다.")
+    st.markdown("### 🗺️ 3일간 방문 장소 지도 (Google Maps 한국어)")
 
     col_l1, col_l2, col_l3, col_l4 = st.columns(4)
     with col_l1:
@@ -805,94 +806,151 @@ with tab2:
     with col_l4:
         st.markdown("🟠 **숙소** (긴자)")
 
-    m = folium.Map(location=[35.68, 139.75], zoom_start=12, tiles="cartodbpositron")
+    key_col, help_col = st.columns([5, 1])
+    with key_col:
+        gmaps_key = st.text_input(
+            "Google Maps API Key",
+            type="password",
+            placeholder="🔑 Google Maps API Key 입력 (AIzaSy...)",
+            label_visibility="collapsed",
+        )
+    with help_col:
+        st.markdown("[키 발급 방법 →](https://developers.google.com/maps/documentation/javascript/get-api-key)")
 
+    # 마커 데이터 구성
     day_spots = {
         "day1": {
-            "color": "red",
+            "icon": "http://maps.google.com/mapfiles/ms/icons/red-dot.png",
             "label": "1일차 (5/1 목)",
             "spots": ["narita_airport", "ueno_park", "ameyoko", "ginza"],
         },
         "day2": {
-            "color": "blue",
+            "icon": "http://maps.google.com/mapfiles/ms/icons/blue-dot.png",
             "label": "2일차 (5/2 금)",
             "spots": ["shibuya", "shibuya_sky", "shinjuku_gyoen", "shinjuku_omoide"],
         },
         "day3": {
-            "color": "green",
+            "icon": "http://maps.google.com/mapfiles/ms/icons/green-dot.png",
             "label": "3일차 (5/3 토)",
             "spots": ["tokyo_station", "ueno_park", "narita_airport"],
         },
     }
 
+    markers = []
     for day_key, info in day_spots.items():
         for spot_key in info["spots"]:
             spot = SPOTS[spot_key]
             fee_text = "무료" if spot["fee"] == 0 else f"¥{spot['fee']:,}"
-            popup_html = f"""
-            <div style="min-width:200px;font-family:sans-serif;">
-                <b style="font-size:14px;">{spot['name']}</b><br>
-                <span style="color:#666;font-size:12px;">{info['label']}</span>
-                <hr style="margin:4px 0;">
-                <b>운영:</b> {spot['hours']}<br>
-                <b>입장료:</b> {fee_text}<br>
-                <p style="font-size:12px;color:#444;margin-top:4px;">{spot['desc']}</p>
-            </div>
-            """
-            folium.Marker(
-                location=[spot["lat"], spot["lon"]],
-                popup=folium.Popup(popup_html, max_width=300),
-                tooltip=spot["name"],
-                icon=folium.Icon(color=info["color"], icon="info-sign"),
-            ).add_to(m)
+            markers.append({
+                "lat": spot["lat"],
+                "lng": spot["lon"],
+                "title": spot["name"],
+                "body": f"<b>{spot['name']}</b><br><span style='color:#888;font-size:12px;'>{info['label']}</span><hr style='margin:4px 0;'><b>운영:</b> {spot['hours']}<br><b>입장료:</b> {fee_text}<br><p style='font-size:12px;color:#555;margin:4px 0 0;'>{spot['desc']}</p>",
+                "icon": info["icon"],
+            })
 
-    # 숙소 마커
     for hotel in HOTELS:
-        popup_html = f"""
-        <div style="min-width:200px;font-family:sans-serif;">
-            <b style="font-size:14px;">🏨 {hotel['name']}</b><br>
-            <span style="color:#666;">{hotel['area']}</span>
-            <hr style="margin:4px 0;">
-            <b>1박:</b> ₩{hotel['price_per_night_krw']:,}<br>
-            <b>접근성:</b> {hotel['access']}
-        </div>
-        """
-        folium.Marker(
-            location=[hotel["lat"], hotel["lon"]],
-            popup=folium.Popup(popup_html, max_width=300),
-            tooltip=f"🏨 {hotel['name']}",
-            icon=folium.Icon(color="orange", icon="home"),
-        ).add_to(m)
+        markers.append({
+            "lat": hotel["lat"],
+            "lng": hotel["lon"],
+            "title": f"🏨 {hotel['name']}",
+            "body": f"<b>🏨 {hotel['name']}</b><br><span style='color:#888;font-size:12px;'>숙소 | {hotel['area']}</span><hr style='margin:4px 0;'><b>1박:</b> ₩{hotel['price_per_night_krw']:,}<br><b>접근:</b> {hotel['access']}",
+            "icon": "http://maps.google.com/mapfiles/ms/icons/orange-dot.png",
+        })
 
-    # 경로선 Day 1
-    day1_coords = [
-        [SPOTS["narita_airport"]["lat"], SPOTS["narita_airport"]["lon"]],
-        [SPOTS["ueno_park"]["lat"], SPOTS["ueno_park"]["lon"]],
-        [SPOTS["ameyoko"]["lat"], SPOTS["ameyoko"]["lon"]],
-        [SPOTS["ginza"]["lat"], SPOTS["ginza"]["lon"]],
+    # 경로선 데이터
+    polylines = [
+        {
+            "coords": [
+                {"lat": SPOTS["narita_airport"]["lat"], "lng": SPOTS["narita_airport"]["lon"]},
+                {"lat": SPOTS["ueno_park"]["lat"],      "lng": SPOTS["ueno_park"]["lon"]},
+                {"lat": SPOTS["ameyoko"]["lat"],        "lng": SPOTS["ameyoko"]["lon"]},
+                {"lat": SPOTS["ginza"]["lat"],          "lng": SPOTS["ginza"]["lon"]},
+            ],
+            "color": "#e74c3c",
+        },
+        {
+            "coords": [
+                {"lat": SPOTS["ginza"]["lat"],           "lng": SPOTS["ginza"]["lon"]},
+                {"lat": SPOTS["shibuya"]["lat"],         "lng": SPOTS["shibuya"]["lon"]},
+                {"lat": SPOTS["shinjuku_gyoen"]["lat"],  "lng": SPOTS["shinjuku_gyoen"]["lon"]},
+                {"lat": SPOTS["shinjuku_omoide"]["lat"], "lng": SPOTS["shinjuku_omoide"]["lon"]},
+                {"lat": SPOTS["ginza"]["lat"],           "lng": SPOTS["ginza"]["lon"]},
+            ],
+            "color": "#2980b9",
+        },
+        {
+            "coords": [
+                {"lat": SPOTS["ginza"]["lat"],          "lng": SPOTS["ginza"]["lon"]},
+                {"lat": SPOTS["tokyo_station"]["lat"],  "lng": SPOTS["tokyo_station"]["lon"]},
+                {"lat": SPOTS["ueno_park"]["lat"],      "lng": SPOTS["ueno_park"]["lon"]},
+                {"lat": SPOTS["narita_airport"]["lat"], "lng": SPOTS["narita_airport"]["lon"]},
+            ],
+            "color": "#27ae60",
+        },
     ]
-    folium.PolyLine(day1_coords, color="red", weight=3, opacity=0.6, dash_array="8").add_to(m)
 
-    # 경로선 Day 2
-    day2_coords = [
-        [SPOTS["ginza"]["lat"], SPOTS["ginza"]["lon"]],
-        [SPOTS["shibuya"]["lat"], SPOTS["shibuya"]["lon"]],
-        [SPOTS["shinjuku_gyoen"]["lat"], SPOTS["shinjuku_gyoen"]["lon"]],
-        [SPOTS["shinjuku_omoide"]["lat"], SPOTS["shinjuku_omoide"]["lon"]],
-        [SPOTS["ginza"]["lat"], SPOTS["ginza"]["lon"]],
-    ]
-    folium.PolyLine(day2_coords, color="blue", weight=3, opacity=0.6, dash_array="8").add_to(m)
+    if gmaps_key:
+        markers_json   = json.dumps(markers,    ensure_ascii=False)
+        polylines_json = json.dumps(polylines,  ensure_ascii=False)
+        html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>html,body{{margin:0;padding:0;height:100%}}#map{{height:600px;width:100%}}</style>
+</head><body>
+<div id="map"></div>
+<script>
+const MARKERS   = {markers_json};
+const POLYLINES = {polylines_json};
+let map, infoWindow;
+function initMap() {{
+    map = new google.maps.Map(document.getElementById('map'), {{
+        zoom: 11,
+        center: {{lat: 35.68, lng: 139.75}},
+    }});
+    infoWindow = new google.maps.InfoWindow();
+    MARKERS.forEach(function(d) {{
+        const mk = new google.maps.Marker({{
+            position: {{lat: d.lat, lng: d.lng}},
+            map: map, title: d.title,
+            icon: d.icon,
+        }});
+        mk.addListener('click', function() {{
+            infoWindow.setContent('<div style="font-family:\'Noto Sans KR\',sans-serif;min-width:200px;font-size:13px;">' + d.body + '</div>');
+            infoWindow.open(map, mk);
+        }});
+    }});
+    POLYLINES.forEach(function(p) {{
+        new google.maps.Polyline({{
+            path: p.coords, map: map,
+            strokeColor: p.color, strokeOpacity: 0.7,
+            strokeWeight: 3, icons: [{{icon:{{path:'M 0,-1 0,1',strokeOpacity:1,scale:3}},offset:'0',repeat:'16px'}}]
+        }});
+    }});
+}}
+</script>
+<script async defer src="https://maps.googleapis.com/maps/api/js?key={gmaps_key}&callback=initMap&language=ko&region=JP"></script>
+</body></html>"""
+        components.html(html, height=620)
 
-    # 경로선 Day 3
-    day3_coords = [
-        [SPOTS["ginza"]["lat"], SPOTS["ginza"]["lon"]],
-        [SPOTS["tokyo_station"]["lat"], SPOTS["tokyo_station"]["lon"]],
-        [SPOTS["ueno_park"]["lat"], SPOTS["ueno_park"]["lon"]],
-        [SPOTS["narita_airport"]["lat"], SPOTS["narita_airport"]["lon"]],
-    ]
-    folium.PolyLine(day3_coords, color="green", weight=3, opacity=0.6, dash_array="8").add_to(m)
-
-    st_folium(m, height=600, use_container_width=True)
+    else:
+        st.info("💡 Google Maps API 키를 입력하면 한국어 구글 지도가 표시됩니다. 키가 없으면 아래 기본 지도를 이용하세요.")
+        m = folium.Map(location=[35.68, 139.75], zoom_start=11, tiles="OpenStreetMap")
+        folium_colors = {"day1": "red", "day2": "blue", "day3": "green"}
+        for day_key, info in day_spots.items():
+            for spot_key in info["spots"]:
+                spot = SPOTS[spot_key]
+                folium.Marker(
+                    location=[spot["lat"], spot["lon"]],
+                    tooltip=spot["name"],
+                    icon=folium.Icon(color=folium_colors[day_key], icon="info-sign"),
+                ).add_to(m)
+        for hotel in HOTELS:
+            folium.Marker(
+                location=[hotel["lat"], hotel["lon"]],
+                tooltip=f"🏨 {hotel['name']}",
+                icon=folium.Icon(color="orange", icon="home"),
+            ).add_to(m)
+        st_folium(m, height=550, use_container_width=True)
 
 
 # ============================================================
