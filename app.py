@@ -884,8 +884,8 @@ with tab2:
 <link href="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.css" rel="stylesheet">
 <script src="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.js"></script>
 <style>
-  html, body {{ margin:0; padding:0; height:100%; }}
-  #map {{ position:absolute; top:0; bottom:0; width:100%; }}
+  html, body {{ margin:0; padding:0; }}
+  #map {{ height:600px; width:100%; }}
   .maplibregl-popup-content {{
     border-radius:12px !important;
     box-shadow:0 4px 20px rgba(0,0,0,0.15) !important;
